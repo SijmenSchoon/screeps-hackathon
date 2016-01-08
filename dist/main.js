@@ -1,37 +1,88 @@
-var harvester = require('harvester');
+function randomSpawn()
+{
+    var spawns = Object.keys(Game.spawns);
+    return Game.spawns[spawns[Math.random() * spawns.length << 0]];
+}
 
-module.exports.loop = function () {
+function randomSource(room)
+{
+    var sources = room.find(FIND_SOURCES);
+    return sources[Math.random() * sources.length << 0];
+}
 
-    for(var name in Game.creeps) {
-        var creep = Game.creeps[name];
+Creep.prototype.tick = function()
+{
+    switch (this.memory.role)
+    {
+    case 'harvester':
+        if (this.carry.energy >= this.carryCapacity)
+        {
+            if (this.memory.spawnGoal == undefined)
+            {
+                this.memory.spawnGoal = randomSpawn().pos;
+            }
+            else
+            {
+                var spawn = this.room.lookForAt('structure', this.memory.spawnGoal.x, this.memory.spawnGoal.y)[0];
+                this.moveTo(spawn);
 
-        if(creep.memory.role == 'harvester') {
-            harvester(creep);
-        }
-
-        if(creep.memory.role == 'builder') {
-
-            if(creep.carry.energy == 0) {
-                if(Game.spawns.Spawn1.transferEnergy(creep) == ERR_NOT_IN_RANGE) {
-                    creep.moveTo(Game.spawns.Spawn1);
+                if (this.transfer(spawn, RESOURCE_ENERGY) == ERR_FULL)
+                {
+                    if (this.room.storage != undefined)
+                        this.memory.spawnGoal = this.room.storage.pos;
+                    else
+                        this.memory.spawnGoal = randomSpawn().pos;
                 }
             }
-            else {
-                var targets = creep.room.find(FIND_CONSTRUCTION_SITES);
-                if(targets.length) {
-                    if(creep.build(targets[0]) == ERR_NOT_IN_RANGE) {
-                        creep.moveTo(targets[0]);
-                    }
-                }
-            }
         }
-        if(creep.memory.role == 'guard') {
-            var targets = creep.room.find(FIND_HOSTILE_CREEPS);
-            if(targets.length) {
-                if(creep.attack(targets[0]) == ERR_NOT_IN_RANGE) {
-                    creep.moveTo(targets[0]);
-                }
+        else
+        {
+            if (this.memory.sourceGoal == undefined)
+            {
+                this.memory.sourceGoal = randomSource(this.room).pos;
+            }
+            else
+            {
+                var source = this.room.lookForAt('source', this.memory.sourceGoal.x, this.memory.sourceGoal.y)[0];
+                this.moveTo(source);
+                this.harvest(source);
             }
         }
     }
 }
+
+Spawn.prototype.create = function(creepType)
+{
+    switch (creepType)
+    {
+    case 'harvester':
+        return this.createCreep([WORK, CARRY, MOVE], undefined, {'role': 'harvester'});
+
+    case 'guard':
+        return this.createCreep([ATTACK, TOUGH, MOVE, MOVE], undefined, {'role': 'guard'});
+    }
+}
+
+Spawn.prototype.spawnQueue = [
+    'harvester',
+    'guard',
+    'harvester',
+    'guard'
+]
+
+
+module.exports.loop = function () {
+    if (Object.keys(Game.creeps).length == 0)
+    {
+        var spawn = randomSpawn();
+        console.log('Spawning a ' + spawn.spawnQueue[0]);
+        spawn.create(spawn.spawnQueue[0]);
+    }
+
+    for (var name in Game.creeps) {
+        var creep = Game.creeps[name];
+        creep.tick();
+    }
+}
+
+
