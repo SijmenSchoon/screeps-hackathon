@@ -10,44 +10,68 @@ function randomSource(room)
     return sources[Math.random() * sources.length << 0];
 }
 
+Creep.prototype.tickHarvester = function()
+{
+    if (this.carry.energy >= this.carryCapacity)
+    {
+        if (this.memory.spawnGoal == undefined)
+        {
+            this.memory.spawnGoal = randomSpawn().pos;
+        }
+        else
+        {
+            var spawn = this.room.lookForAt('structure', this.memory.spawnGoal.x, this.memory.spawnGoal.y)[0];
+            this.moveTo(spawn);
+
+            if (this.transfer(spawn, RESOURCE_ENERGY) == ERR_FULL)
+            {
+                if (this.room.storage != undefined)
+                    this.memory.spawnGoal = this.room.storage.pos;
+                else
+                    this.memory.spawnGoal = randomSpawn().pos;
+            }
+        }
+    }
+    else
+    {
+        if (this.memory.sourceGoal == undefined)
+        {
+            this.memory.sourceGoal = randomSource(this.room).pos;
+        }
+        else
+        {
+            var source = this.room.lookForAt('source', this.memory.sourceGoal.x, this.memory.sourceGoal.y)[0];
+            this.moveTo(source);
+            this.harvest(source);
+        }
+    }
+}
+
+Creep.prototype.tickGuard = function()
+{
+    var closest = Game.spawns.Spawn1.pos.findClosestByPath(FIND_HOSTILE_CREEPS);
+    if (closest == null || closest.owner.username == 'Source Keeper')
+    {
+        this.moveTo(Game.spawns.Spawn1)
+    }
+    else
+    {
+        this.moveTo(closest);
+        this.attack(closest);
+    }
+}
+
 Creep.prototype.tick = function()
 {
     switch (this.memory.role)
     {
     case 'harvester':
-        if (this.carry.energy >= this.carryCapacity)
-        {
-            if (this.memory.spawnGoal == undefined)
-            {
-                this.memory.spawnGoal = randomSpawn().pos;
-            }
-            else
-            {
-                var spawn = this.room.lookForAt('structure', this.memory.spawnGoal.x, this.memory.spawnGoal.y)[0];
-                this.moveTo(spawn);
+        this.tickHarvester();
+        break;
 
-                if (this.transfer(spawn, RESOURCE_ENERGY) == ERR_FULL)
-                {
-                    if (this.room.storage != undefined)
-                        this.memory.spawnGoal = this.room.storage.pos;
-                    else
-                        this.memory.spawnGoal = randomSpawn().pos;
-                }
-            }
-        }
-        else
-        {
-            if (this.memory.sourceGoal == undefined)
-            {
-                this.memory.sourceGoal = randomSource(this.room).pos;
-            }
-            else
-            {
-                var source = this.room.lookForAt('source', this.memory.sourceGoal.x, this.memory.sourceGoal.y)[0];
-                this.moveTo(source);
-                this.harvest(source);
-            }
-        }
+    case 'guard':
+        this.tickGuard();
+        break;
     }
 }
 
